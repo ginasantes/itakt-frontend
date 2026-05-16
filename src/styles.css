@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #f4efe6;
+  --bg-soft: #fbf8f2;
+  --panel: rgba(255, 255, 255, 0.86);
+  --panel-strong: #ffffff;
+  --line: rgba(15, 23, 42, 0.12);
+  --text: #0f172a;
+  --muted: #5f6b7a;
+  --navy: #1d2a44;
+  --navy-strong: #131d31;
+  --accent: #d97706;
+  --accent-soft: rgba(217, 119, 6, 0.12);
+  --success: #15803d;
+  --danger: #b91c1c;
+  --shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+  --radius-xl: 28px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 26%),
+    radial-gradient(circle at top right, rgba(217, 119, 6, 0.1), transparent 24%),
+    linear-gradient(180deg, #f7f3ea 0%, #eef3f8 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}

@@ -1,0 +1,341 @@
+/* ================================================================
+   ESTILOS: Registro de Movimientos de Inventario
+   ================================================================ */
+
+.registro-movimientos-container {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 600px;
+  margin: 20px auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-left: 5px solid #3b82f6;
+}
+
+.registro-movimientos-container h2 {
+  color: #1f2937;
+  margin-top: 0;
+  margin-bottom: 24px;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  color: #374151;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background-color: #f0f9ff;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Tipo de Movimiento - Botones */
+.tipo-movimiento-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-tipo {
+  padding: 16px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-align: center;
+  line-height: 1.4;
+  color: #6b7280;
+}
+
+.btn-tipo:hover {
+  border-color: #9ca3af;
+  background: #f9fafb;
+  transform: translateY(-2px);
+}
+
+.btn-tipo.activo {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1e40af;
+  font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-tipo small {
+  display: block;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 6px;
+  font-weight: 400;
+}
+
+.btn-tipo.activo small {
+  color: #0e7490;
+}
+
+/* Alertas */
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-weight: 500;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-success {
+  background-color: #d1fae5;
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+
+.alert-error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+
+/* Botón Primary */
+.btn-primary {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #9ca3af;
+}
+
+/* ================================================================
+   HISTORIAL DE MOVIMIENTOS
+   ================================================================ */
+
+.historial-section {
+  margin-top: 30px;
+  border-top: 2px solid #e5e7eb;
+  padding-top: 20px;
+}
+
+.btn-historial {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.btn-historial:hover {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  border-color: #9ca3af;
+}
+
+.btn-historial:active {
+  background: #d1d5db;
+}
+
+.historial-container {
+  margin-top: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.historial-table-wrapper {
+  overflow-x: auto;
+}
+
+.historial-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.historial-table thead {
+  background: #374151;
+  color: white;
+  text-align: left;
+}
+
+.historial-table th {
+  padding: 10px 8px;
+  font-weight: 600;
+  border-bottom: 2px solid #1f2937;
+}
+
+.historial-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.historial-table tbody tr:hover {
+  background-color: #f3f4f6;
+}
+
+.historial-table td {
+  padding: 10px 8px;
+}
+
+.historial-table .fecha {
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.historial-table .tipo {
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.historial-table .tipo-daño {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.historial-table .tipo-merma {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.historial-table .tipo-reposición {
+  background: #dbeafe;
+  color: #0c4a6e;
+}
+
+.historial-table .cantidad {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.historial-table .responsable {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.historial-table .descripcion {
+  color: #374151;
+  max-width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loading {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 16px;
+}
+
+.empty {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 16px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .registro-movimientos-container {
+    margin: 10px;
+    padding: 16px;
+  }
+
+  .tipo-movimiento-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-tipo {
+    padding: 12px 10px;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    font-size: 16px; /* Previene zoom en iOS */
+  }
+}
