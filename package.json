@@ -2,6 +2,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.103.2",
     "express": "^5.2.1",
+    "jspdf": "^4.2.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.1",

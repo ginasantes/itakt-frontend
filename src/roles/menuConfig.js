@@ -230,6 +230,7 @@ export function getSectionMeta(sectionKey) {
       title: 'Checklist y Operación catering',
       description: 'Checklist, tickets, consumos por evento y control operativo del catering.'
     },
+
     movimientos_catering: {
       title: 'Movimientos de insumos catering',
       description: 'Registro de salidas por insumo: uso en evento, merma, prestado, utilería y renta de servicio.'

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { jsPDF } from 'jspdf';
 import {
   buildMailToLink,
   buildWhatsAppLink,
@@ -18,6 +19,13 @@ import {
   guardarOperacionCatering,
   obtenerOperacionCatering
 } from '../../services/catering';
+import {
+  obtenerHistorialEventoCompleto,
+  exportarHistorialJSON,
+  exportarHistorialCSV,
+  exportarHistorialPDF,
+  calcularResumenHistorial
+} from '../../services/cateringHistorial';
 import {
   actualizarConfiguracionNegocio,
   crearUsuarioCatering,
@@ -830,7 +838,6 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
   const [moduleMessage, setModuleMessage] = useState('');
   const [moduleError, setModuleError] = useState('');
   const [isSavingModule, setIsSavingModule] = useState(false);
-  const [historialFiltro, setHistorialFiltro] = useState({ periodo: 'mes', fechaInicio: '', fechaFin: '' });
   // Almacén y compras catering
   const [almacenCompras, setAlmacenCompras] = useState(null);
   const [almacenError, setAlmacenError] = useState('');
@@ -861,7 +868,18 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
   const isMovimientosSection = activeSection === 'movimientos_catering';
   const isAdminPreciosSection = activeSection === 'admin_precios_catering';
   const isDashboardCateringSection = activeSection === 'dashboard_catering';
+  const isHistorialSection = activeSection === 'historial_catering';
   const [operacionTab, setOperacionTab] = useState('checklist'); // 'checklist' o 'movimientos'
+  const [periodFiltroHistorial, setPeriodFiltroHistorial] = useState('mes'); // DEPRECATED - ahora usamos fechas
+  const [fechaHistorialInicio, setFechaHistorialInicio] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().slice(0, 10));
+  const [fechaHistorialFin, setFechaHistorialFin] = useState(new Date().toISOString().slice(0, 10));
+  
+  // Historial state
+  const [historialEventos, setHistorialEventos] = useState([]);
+  const [historialSeleccionado, setHistorialSeleccionado] = useState(null);
+  const [historialLoading, setHistorialLoading] = useState(false);
+  const [historialError, setHistorialError] = useState('');
+  const [historialFiltro, setHistorialFiltro] = useState({ estado: 'liquidado' });
 
   // Movimientos catering state
   const [movimientosCatData, setMovimientosCatData] = useState(null);
@@ -2334,7 +2352,7 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
       correo_cliente: cotizacionRelacionada?.correo_cliente || ''
     };
   })();
-  const selectedOperacion = (data?.salidas || []).find((item) => item.id_control_cat === seleccion.operacion) || null;
+  const selectedOperacion = (data?.tickets || []).find((item) => item.id_ticket === seleccion.operacion) || null;
   const allEquipmentAndProviders = [...(catalogos.equiposPropios || []), ...(catalogos.proveedoresRenta || []), ...(catalogos.proveedoresOperacion || [])];
   const cotizacionEstimate = buildEstimate(cotizacionForm, catalogos.recetas, allEquipmentAndProviders, allEquipmentAndProviders);
   const eventoEstimate = buildEstimate(eventoForm, catalogos.recetas, allEquipmentAndProviders, allEquipmentAndProviders);
@@ -2970,7 +2988,7 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
     // Auto-generate ticket code if empty
     const formData = { ...operacionForm };
     if (!formData.ticket_codigo || formData.ticket_codigo.trim() === '') {
-      formData.ticket_codigo = generateTicketCode(data?.salidas || []);
+      formData.ticket_codigo = generateTicketCode(data?.tickets || []);
     }
 
     const result = await guardarOperacionCatering({
@@ -3178,7 +3196,7 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
         { title: 'Cotizados', value: data?.resumen?.cotizados || 0, detail: 'Cotizaciones registradas' },
         { title: 'Por pagar', value: data?.resumen?.porPagar || 0, detail: 'Eventos con saldo pendiente' },
         { title: 'Operando', value: data?.resumen?.eventosOperando || 0, detail: 'Eventos en curso' },
-        { title: 'Tickets', value: data?.resumen?.salidas || 0, detail: 'Tickets de seguimiento guardados' }
+        { title: 'Tickets', value: data?.resumen?.tickets || 0, detail: 'Tickets de seguimiento guardados' }
       ],
       movimientos: historialFiltrado
     });
@@ -4445,85 +4463,15 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
           )}
         </div>
 
-        <div className="almacen-subpanel">
-          <div className="almacen-subpanel-header">
-            <h3>Historial de pagos y tickets</h3>
-            <span>{historialFiltrado.length} movimientos</span>
-          </div>
-
-          <div className="period-filter-shell">
-            <div className="period-filter-row">
-              <button
-                type="button"
-                className={`module-action-button period-filter-button ${historialFiltro.periodo === 'semana' && !historialFiltro.fechaInicio && !historialFiltro.fechaFin ? 'active' : ''}`}
-                onClick={() => setHistorialFiltro({ periodo: 'semana', fechaInicio: '', fechaFin: '' })}
-              >
-                Semana
-              </button>
-              <button
-                type="button"
-                className={`module-action-button period-filter-button ${historialFiltro.periodo === 'mes' && !historialFiltro.fechaInicio && !historialFiltro.fechaFin ? 'active' : ''}`}
-                onClick={() => setHistorialFiltro({ periodo: 'mes', fechaInicio: '', fechaFin: '' })}
-              >
-                Mes
-              </button>
-              <button
-                type="button"
-                className={`module-action-button period-filter-button ${historialFiltro.periodo === 'anio' && !historialFiltro.fechaInicio && !historialFiltro.fechaFin ? 'active' : ''}`}
-                onClick={() => setHistorialFiltro({ periodo: 'anio', fechaInicio: '', fechaFin: '' })}
-              >
-                Año
-              </button>
-            </div>
-            <div className="module-actions">
-              <button type="button" className="module-action-button success" onClick={exportarHistorialCateringCsv}>
-                Descargar Excel
-              </button>
-              <button type="button" className="module-action-button" onClick={exportarHistorialCateringPdf}>
-                Descargar PDF
-              </button>
-            </div>
-          </div>
-
-          <div className="form-grid-fields">
-            <label>
-              <span>Fecha inicio</span>
-              <input
-                type="date"
-                value={historialFiltro.fechaInicio}
-                onChange={(event) => setHistorialFiltro((current) => ({ ...current, fechaInicio: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>Fecha fin</span>
-              <input
-                type="date"
-                value={historialFiltro.fechaFin}
-                onChange={(event) => setHistorialFiltro((current) => ({ ...current, fechaFin: event.target.value }))}
-              />
-            </label>
-          </div>
-
-          <div className="mini-list compact-list">
-            {historialFiltrado.map((item) => (
-              <div className="mini-item" key={item.id}>
-                <strong>{item.concepto}</strong>
-                <span>{item.detalle}</span>
-                <span>{item.responsable} · {item.fecha_label}</span>
-                <em>{item.total_label}</em>
-              </div>
-            ))}
-            {!historialFiltrado.length && <p className="panel-empty">Sin movimientos en el periodo seleccionado.</p>}
-          </div>
-        </div>
+        {/* SECCIÓN ELIMINADA - USAR SOLO LA NUEVA ABAJO */}
 
         <div className="almacen-subpanel">
           <div className="almacen-subpanel-header">
             <h3>Tickets registrados</h3>
-            <span>{data?.salidas?.length || 0} movimientos</span>
+            <span>{data?.tickets?.length || 0} movimientos</span>
           </div>
           <div className="mini-list compact-list">
-            {(data?.salidas || []).map((item) => (
+            {(data?.tickets || []).map((item) => (
               <button
                 type="button"
                 className={`mini-item selectable-item ${seleccion.operacion === item.id_control_cat ? 'selected' : ''}`}
@@ -4537,6 +4485,267 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="almacen-subpanel">
+          <div className="almacen-subpanel-header">
+            <h3>Histórial de pagos y tickets</h3>
+            <span>Filtro por fecha de inicio a fin</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', alignItems: 'flex-end', flexWrap: 'wrap', padding: '14px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#495057', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📅 Desde:</span>
+              <input
+                type="date"
+                value={fechaHistorialInicio}
+                onChange={(e) => setFechaHistorialInicio(e.target.value)}
+                style={{ padding: '10px 14px', borderRadius: '6px', border: '2px solid #dee2e6', fontSize: '13px', fontWeight: '500', width: '160px', backgroundColor: '#fff', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.2s ease' }}
+                onFocus={(e) => { e.target.style.borderColor = '#17a2b8'; e.target.style.boxShadow = '0 0 0 3px rgba(23,162,184,0.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#dee2e6'; e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; }}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#495057', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📅 Hasta:</span>
+              <input
+                type="date"
+                value={fechaHistorialFin}
+                onChange={(e) => setFechaHistorialFin(e.target.value)}
+                style={{ padding: '10px 14px', borderRadius: '6px', border: '2px solid #dee2e6', fontSize: '13px', fontWeight: '500', width: '160px', backgroundColor: '#fff', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', transition: 'all 0.2s ease' }}
+                onFocus={(e) => { e.target.style.borderColor = '#17a2b8'; e.target.style.boxShadow = '0 0 0 3px rgba(23,162,184,0.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#dee2e6'; e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; }}
+              />
+            </label>
+          </div>
+
+          {(() => {
+            const tickets = (data?.tickets || []).filter((t) => String(t.id_evento) === String(operacionForm.id_evento));
+            
+            const fechaInicio = fechaHistorialInicio ? new Date(fechaHistorialInicio + 'T00:00:00') : null;
+            const fechaFin = fechaHistorialFin ? new Date(fechaHistorialFin + 'T23:59:59') : null;
+            
+            const ticketsFiltrados = tickets.filter((t) => {
+              if (!t.fecha_registro) return false;
+              const fechaTicket = new Date(t.fecha_registro);
+              
+              if (fechaInicio && fechaTicket < fechaInicio) return false;
+              if (fechaFin && fechaTicket > fechaFin) return false;
+              return true;
+            });
+
+            const descargarTicketIndividual = (ticket) => {
+              if (!ticket) return;
+              
+              const nombreEvento = (data?.eventos || []).find(
+                (e) => String(e.id_evento) === String(operacionForm.id_evento)
+              )?.nombre_evento || 'evento';
+              
+              // Crear Excel con formato profesional
+              const fechaActual = new Date().toLocaleDateString('es-MX');
+              let csv = 'DETALLE DE TICKET CATERING\n';
+              csv += `Evento,${nombreEvento}\n`;
+              csv += `Fecha de generación,${fechaActual}\n\n`;
+              csv += 'INFORMACIÓN DEL TICKET\n';
+              csv += 'Ticket ID,Fecha de Registro,Tipo de Pago,Responsable,Monto,Estado\n';
+              
+              const fecha = ticket.fecha_registro ? formatDate(ticket.fecha_registro) : 'N/A';
+              const tipo = ticket.tipo_pago || 'N/A';
+              const responsable = ticket.responsable || 'Sin asignar';
+              const monto = ticket.monto_ticket || 0;
+              const estado = (ticket.estatus_ticket || 'pendiente').toUpperCase();
+              
+              csv += `${ticket.id_ticket},"${fecha}","${tipo}","${responsable}",${monto},"${estado}"\n`;
+              
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = `ticket-${ticket.id_ticket}-${new Date().getTime()}.csv`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(link.href);
+            };
+
+            const descargarTicketPdf = (ticket) => {
+              try {
+                if (!ticket) return;
+                
+                const nombreEvento = (data?.eventos || []).find(
+                  (e) => String(e.id_evento) === String(operacionForm.id_evento)
+                )?.nombre_evento || 'evento';
+                
+                // Crear PDF con jsPDF
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const margin = 15;
+                let yPos = margin;
+                
+                // Título
+                pdf.setFontSize(16);
+                pdf.setFont(undefined, 'bold');
+                pdf.text('Detalle de Ticket', margin, yPos);
+                yPos += 10;
+                
+                // Línea separadora
+                pdf.setDrawColor(200, 200, 200);
+                pdf.line(margin, yPos, pageWidth - margin, yPos);
+                yPos += 8;
+                
+                // Información principal
+                pdf.setFontSize(11);
+                pdf.setFont(undefined, 'normal');
+                
+                const infoFields = [
+                  { label: 'Evento:', value: nombreEvento },
+                  { label: 'Ticket ID:', value: ticket.id_ticket || 'N/A' },
+                  { label: 'Fecha:', value: ticket.fecha_registro ? formatDate(ticket.fecha_registro) : 'N/A' },
+                  { label: 'Tipo de Pago:', value: ticket.tipo_pago || 'N/A' },
+                  { label: 'Responsable:', value: ticket.responsable || 'N/A' },
+                  { label: 'Estado:', value: (ticket.estatus_ticket || 'pendiente').toUpperCase() }
+                ];
+                
+                infoFields.forEach(field => {
+                  pdf.setFont(undefined, 'bold');
+                  pdf.text(field.label, margin, yPos);
+                  pdf.setFont(undefined, 'normal');
+                  pdf.text(String(field.value), margin + 45, yPos);
+                  yPos += 7;
+                });
+                
+                // Monto destacado en caja verde
+                yPos += 5;
+                pdf.setDrawColor(46, 125, 50);
+                pdf.setFillColor(232, 245, 233);
+                pdf.rect(margin, yPos, pageWidth - 2 * margin, 12, 'F');
+                pdf.setFont(undefined, 'bold');
+                pdf.setTextColor(46, 125, 50);
+                pdf.text(`Monto: ${formatCurrency(ticket.monto_ticket || 0)}`, margin + 5, yPos + 8);
+                pdf.setTextColor(0, 0, 0);
+                yPos += 18;
+                
+                // Observaciones NO se muestran (evitar JSON y datos innecesarios)
+                
+                // Descargar PDF
+                const timestamp = new Date().getTime();
+                pdf.save(`ticket-${ticket.id_ticket}-${timestamp}.pdf`);
+              } catch (error) {
+                console.error('Error generando PDF:', error);
+                alert('Error al generar el PDF');
+              }
+            };
+
+            if (ticketsFiltrados.length === 0) {
+              return (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#999', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                  <p>Sin tickets en el rango de fechas seleccionado.</p>
+                  {!operacionForm.id_evento && <p style={{ fontSize: '12px', marginTop: '8px' }}>Selecciona un evento primero</p>}
+                </div>
+              );
+            }
+
+            return (
+              <div>
+                <div style={{ marginBottom: '12px', fontSize: '13px', color: '#666' }}>
+                  {ticketsFiltrados.length} ticket{ticketsFiltrados.length !== 1 ? 's' : ''} encontrado{ticketsFiltrados.length !== 1 ? 's' : ''}
+                </div>
+                
+                <div className="mini-list compact-list">
+                  {ticketsFiltrados.map((ticket, idx) => (
+                    <div
+                      key={`ticket-${ticket.id_ticket || idx}`}
+                      style={{
+                        padding: '12px',
+                        marginBottom: '8px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '4px',
+                        backgroundColor: idx % 2 === 0 ? '#fafafa' : '#fff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <strong style={{ fontSize: '14px' }}>
+                            Ticket #{ticket.id_ticket} · {ticket.tipo_pago || 'Pago'} · {formatDate(ticket.fecha_registro)}
+                          </strong>
+                          <span style={{
+                            padding: '4px 8px',
+                            borderRadius: '3px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            backgroundColor: ticket.estatus_ticket === 'pagado' ? '#d4edda' : '#fff3cd',
+                            color: ticket.estatus_ticket === 'pagado' ? '#155724' : '#856404'
+                          }}>
+                            {ticket.estatus_ticket || 'pendiente'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>
+                          Responsable: {ticket.responsable || 'Sin asignar'}
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: '#2d5016' }}>
+                          {formatCurrency(ticket.monto_ticket || 0)}
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => descargarTicketIndividual(ticket)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: '#10b981',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap'
+                          }}
+                          onMouseEnter={(e) => { e.target.style.backgroundColor = '#059669'; e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'; e.target.style.transform = 'translateY(-2px)'; }}
+                          onMouseLeave={(e) => { e.target.style.backgroundColor = '#10b981'; e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'; e.target.style.transform = 'translateY(0)'; }}
+                        >
+                          📊 Excel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => descargarTicketPdf(ticket)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: '#3b82f6',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap'
+                          }}
+                          onMouseEnter={(e) => { e.target.style.backgroundColor = '#2563eb'; e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'; e.target.style.transform = 'translateY(-2px)'; }}
+                          onMouseLeave={(e) => { e.target.style.backgroundColor = '#3b82f6'; e.target.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'; e.target.style.transform = 'translateY(0)'; }}
+                        >
+                          📄 PDF
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
         </div>
         )}
@@ -5336,6 +5545,246 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
     );
   }
 
+  async function cargarHistorialEventos() {
+    setHistorialLoading(true);
+    setHistorialError('');
+    setHistorialEventos([]);
+    setHistorialSeleccionado(null);
+
+    try {
+      // Filtrar eventos que estén en estado "liquidado"
+      const eventosLiquidados = (data?.eventos || []).filter(
+        (ev) => ev.estatus_evento === 'liquidado'
+      );
+
+      setHistorialEventos(eventosLiquidados);
+    } catch (err) {
+      setHistorialError('Error al cargar historial: ' + err.message);
+    } finally {
+      setHistorialLoading(false);
+    }
+  }
+
+  async function verHistorialEvento(evento) {
+    setHistorialLoading(true);
+    setHistorialError('');
+
+    try {
+      const resultado = await obtenerHistorialEventoCompleto({
+        eventId: evento.id_evento,
+        businessId: user.business_id
+      });
+
+      if (resultado.error) {
+        setHistorialError(resultado.error);
+        setHistorialSeleccionado(null);
+        return;
+      }
+
+      setHistorialSeleccionado({
+        ...evento,
+        ...resultado.data
+      });
+    } catch (err) {
+      setHistorialError('Error: ' + err.message);
+    } finally {
+      setHistorialLoading(false);
+    }
+  }
+
+  function handleExportarHistorialPDF() {
+    if (!historialSeleccionado) {
+      setHistorialError('Selecciona un evento');
+      return;
+    }
+    
+    const nombreEvento = historialSeleccionado.nombre_evento || 'Evento';
+    exportarHistorialPDF(historialSeleccionado, nombreEvento);
+  }
+
+  function handleExportarHistorialCSV() {
+    if (!historialSeleccionado) {
+      setHistorialError('Selecciona un evento');
+      return;
+    }
+    
+    const nombreEvento = historialSeleccionado.nombre_evento || 'Evento';
+    exportarHistorialCSV(historialSeleccionado, nombreEvento);
+  }
+
+  function handleExportarHistorialJSON() {
+    if (!historialSeleccionado) {
+      setHistorialError('Selecciona un evento');
+      return;
+    }
+    
+    const nombreEvento = historialSeleccionado.nombre_evento || 'Evento';
+    exportarHistorialJSON(historialSeleccionado, nombreEvento);
+  }
+
+  useEffect(() => {
+    if (isHistorialSection && data?.eventos) {
+      cargarHistorialEventos();
+    }
+  }, [isHistorialSection, data?.eventos]);
+
+  function renderHistorialEditor() {
+    return (
+      <div className="almacen-layout">
+        {historialError && (
+          <div className="operation-banner error" style={{ marginBottom: '16px' }}>
+            {historialError}
+          </div>
+        )}
+
+        <div className="almacen-subpanel-grid">
+          {/* PANEL IZQUIERDO: LISTA DE EVENTOS LIQUIDADOS */}
+          <div className="almacen-subpanel">
+            <div className="almacen-subpanel-header">
+              <h3>Eventos Liquidados</h3>
+              <span>{historialEventos.length} eventos</span>
+            </div>
+
+            {historialLoading && <p className="panel-empty">Cargando eventos...</p>}
+            {!historialLoading && historialEventos.length === 0 && (
+              <p className="panel-empty">No hay eventos liquidados</p>
+            )}
+
+            {!historialLoading && historialEventos.length > 0 && (
+              <div className="mini-list compact-list">
+                {historialEventos.map((evento) => (
+                  <button
+                    key={evento.id_evento}
+                    type="button"
+                    className={`mini-item selectable-item ${
+                      historialSeleccionado?.id_evento === evento.id_evento ? 'selected' : ''
+                    }`}
+                    onClick={() => verHistorialEvento(evento)}
+                  >
+                    <strong>{evento.nombre_evento || 'Sin nombre'}</strong>
+                    <span>{evento.nombre_cliente || 'Sin cliente'}</span>
+                    <span>{formatDate(evento.fecha_evento)} · {evento.numero_personas} personas</span>
+                    <span>{formatCurrency(evento.total_estimado)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* PANEL DERECHO: DETALLES DEL EVENTO SELECCIONADO */}
+          {historialSeleccionado && (
+            <div className="almacen-subpanel">
+              <div className="almacen-subpanel-header">
+                <h3>Detalles del Evento</h3>
+                <span>Sincronizado hoy</span>
+              </div>
+
+              {/* Información del Evento */}
+              <div className="detail-card" style={{ marginBottom: '16px' }}>
+                <strong>{historialSeleccionado.nombre_evento || 'Sin nombre'}</strong>
+                <span>
+                  👤 {historialSeleccionado.nombre_cliente || 'Sin cliente'} · 📱 {historialSeleccionado.telefono_cliente || '—'} · 📧 {historialSeleccionado.correo_cliente || '—'}
+                </span>
+                <span>
+                  📍 {historialSeleccionado.lugar_evento || '—'} · 🗓️ {formatDate(historialSeleccionado.fecha_evento)} · 👥 {historialSeleccionado.numero_personas || 0} personas
+                </span>
+              </div>
+
+              {/* Resumen Financiero */}
+              <div className="detail-card" style={{ backgroundColor: '#f8fafc', marginBottom: '16px' }}>
+                <h5 style={{ marginBottom: '12px', color: '#0f172a' }}>💰 Resumen Financiero</h5>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{padding: '8px', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '4px'}}>
+                    <small style={{ color: '#6b7280' }}>Total</small>
+                    <p style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', margin: '0' }}>
+                      {formatCurrency(historialSeleccionado.total_estimado || 0)}
+                    </p>
+                  </div>
+                  <div style={{padding: '8px', backgroundColor: '#ecfdf5', border: '2px solid #10b981', borderRadius: '4px'}}>
+                    <small style={{ color: '#059669', fontWeight: '600' }}>✓ Pagado</small>
+                    <p style={{ fontSize: '18px', fontWeight: '700', color: '#059669', margin: '0' }}>
+                      {formatCurrency(historialSeleccionado.anticipo_pagado || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tickets */}
+              {historialSeleccionado.tickets && historialSeleccionado.tickets.length > 0 && (
+                <div className="detail-card" style={{ marginBottom: '16px' }}>
+                  <h5 style={{ marginBottom: '12px', color: '#0f172a' }}>🎫 Tickets ({historialSeleccionado.tickets.length})</h5>
+                  <div className="mini-list compact-list">
+                    {historialSeleccionado.tickets.map((ticket, idx) => (
+                      <div key={`ticket-${idx}`} className="mini-item">
+                        <strong>Ticket {ticket.id_control_cat || idx + 1}</strong>
+                        <span>{formatDate(ticket.fecha_registro || ticket.fecha_compromiso)} · {formatCurrency(ticket.monto_ticket)}</span>
+                        <span>{ticket.metodo_pago || 'Sin método'} · {ticket.estatus_ticket}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Movimientos de Inventario */}
+              {historialSeleccionado.movimientos && historialSeleccionado.movimientos.length > 0 && (
+                <div className="detail-card" style={{ marginBottom: '16px' }}>
+                  <h5 style={{ marginBottom: '12px', color: '#0f172a' }}>📦 Movimientos Insumos ({historialSeleccionado.movimientos.length})</h5>
+                  <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600' }}>Insumo</th>
+                        <th style={{ textAlign: 'right', padding: '8px', fontWeight: '600' }}>Cantidad</th>
+                        <th style={{ textAlign: 'right', padding: '8px', fontWeight: '600' }}>Unitario</th>
+                        <th style={{ textAlign: 'right', padding: '8px', fontWeight: '600' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historialSeleccionado.movimientos.map((mov, idx) => (
+                        <tr key={`mov-${idx}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '8px' }}>{mov.nombre_insumo || mov.id_insumo}</td>
+                          <td style={{ textAlign: 'right', padding: '8px' }}>{toNumber(mov.cantidad)} {mov.unidad || ''}</td>
+                          <td style={{ textAlign: 'right', padding: '8px' }}>${toNumber(mov.costo_unitario).toFixed(2)}</td>
+                          <td style={{ textAlign: 'right', padding: '8px', fontWeight: '600' }}>
+                            ${(toNumber(mov.cantidad) * toNumber(mov.costo_unitario)).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Botones de Exportación */}
+              <div className="module-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="module-action-button success"
+                  onClick={handleExportarHistorialPDF}
+                >
+                  📥 Descargar PDF
+                </button>
+                <button
+                  type="button"
+                  className="module-action-button"
+                  onClick={handleExportarHistorialCSV}
+                >
+                  📊 Descargar Excel
+                </button>
+                <button
+                  type="button"
+                  className="module-action-button"
+                  onClick={handleExportarHistorialJSON}
+                >
+                  📄 Descargar JSON
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderContent() {
     if (isNuevoUsuarioSection || isConfiguracionSection) {
       return renderConfiguracionCatering();
@@ -5376,6 +5825,10 @@ export default function CateringWorkspace({ activeSection, user, onOpenMenu, onN
 
     if (isOperacionSection) {
       return renderOperacionEditor();
+    }
+
+    if (isHistorialSection) {
+      return renderHistorialEditor();
     }
 
     return renderOverview();
